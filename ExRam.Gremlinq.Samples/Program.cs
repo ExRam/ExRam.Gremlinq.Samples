@@ -27,12 +27,13 @@ namespace ExRam.Gremlinq.Samples
         public Program()
         {
             _g = g
-                .ConfigureEnvironment(env => env //We call ConfigureEnvironment twice so that the logger is set on the environment from now on.
-                    .UseLogger(LoggerFactory
-                        .Create(builder => builder
-                            .AddFilter(__ => true)
-                            .AddConsole())
-                        .CreateLogger("Queries"))) 
+                .ConfigureEnvironment(env =>
+                    env //We call ConfigureEnvironment twice so that the logger is set on the environment from now on.
+                        .UseLogger(LoggerFactory
+                            .Create(builder => builder
+                                .AddFilter(__ => true)
+                                .AddConsole())
+                            .CreateLogger("Queries")))
                 .ConfigureEnvironment(env => env
                     //Since the Vertex and Edge classes contained in this sample implement IVertex resp. IEdge,
                     //setting a model is actually not required as long as these classes are discoverable (i.e. they reside
@@ -48,7 +49,6 @@ namespace ExRam.Gremlinq.Samples
                     //Enable logging by setting the verbosity to anything but None.
                     .ConfigureOptions(options => options
                         .SetValue(WebSocketGremlinqOptions.QueryLogLogLevel, LogLevel.None))
-
 #if GremlinServer
                     .UseGremlinServer(builder => builder
                         .AtLocalhost()));
@@ -79,6 +79,7 @@ namespace ExRam.Gremlinq.Samples
             await Create_vertices_and_a_relation_in_one_query();
 
             await Who_does_Marko_know();
+            await How_long_has_Marko_known_each_person();
             await Who_Is_Known_By_Both_Marko_And_Peter();
             await Who_is_older_than_30();
             await Whose_name_starts_with_B();
@@ -107,64 +108,70 @@ namespace ExRam.Gremlinq.Samples
             //await _g.V().Drop();
 
             _marko = await _g
-                .AddV(new Person { Name = "Marko", Age = 29 })
+                .AddV(new Person {Name = "Marko", Age = 29})
                 .FirstAsync();
 
             _vadas = await _g
-                .AddV(new Person { Name = "Vadas", Age = 27 })
+                .AddV(new Person {Name = "Vadas", Age = 27})
                 .FirstAsync();
 
             _josh = await _g
-               .AddV(new Person { Name = "Josh", Age = 32 })
-               .FirstAsync();
+                .AddV(new Person {Name = "Josh", Age = 32})
+                .FirstAsync();
 
             _peter = await _g
-               .AddV(new Person { Name = "Peter", Age = 35 })
-               .FirstAsync();
+                .AddV(new Person {Name = "Peter", Age = 35})
+                .FirstAsync();
 
             _daniel = await _g
-               .AddV(new Person
-               {
-                   Name = "Daniel",
-                   Age = 37,
-                   PhoneNumbers = new[]
-                   {
+                .AddV(new Person
+                {
+                    Name = "Daniel",
+                    Age = 37,
+                    PhoneNumbers = new[]
+                    {
                         "+491234567",
                         "+492345678"
-                   }
-               })
-               .FirstAsync();
+                    }
+                })
+                .FirstAsync();
 
             var charlie = await _g
-                .AddV(new Dog { Name = "Charlie", Age = 2 })
+                .AddV(new Dog {Name = "Charlie", Age = 2})
                 .FirstAsync();
 
             var catmanJohn = await _g
-                .AddV(new Cat { Name = "Catman John", Age = 5 })
+                .AddV(new Cat {Name = "Catman John", Age = 5})
                 .FirstAsync();
 
             var luna = await _g
-                .AddV(new Cat { Name = "Luna", Age = 9 })
+                .AddV(new Cat {Name = "Luna", Age = 9})
                 .FirstAsync();
 
             var lop = await _g
-                .AddV(new Software { Name = "Lop", Language = ProgrammingLanguage.Java })
+                .AddV(new Software {Name = "Lop", Language = ProgrammingLanguage.Java})
                 .FirstAsync();
 
             var ripple = await _g
-                .AddV(new Software { Name = "Ripple", Language = ProgrammingLanguage.Java })
+                .AddV(new Software {Name = "Ripple", Language = ProgrammingLanguage.Java})
                 .FirstAsync();
 
             await _g
                 .V(_marko.Id!)
-                .AddE<Knows>()
+                .AddE(new Knows
+                {
+                    Since = DateTime.Today.AddYears(-7)
+                })
                 .To(__ => __
                     .V(_vadas.Id!))
                 .FirstAsync();
 
             await _g
                 .V(_marko.Id!)
-                .AddE<Knows>()
+                .AddE(new Knows
+                {
+                    Since = DateTime.Today.AddYears(-4)
+                })
                 .To(__ => __
                     .V(_josh.Id!))
                 .FirstAsync();
@@ -187,11 +194,11 @@ namespace ExRam.Gremlinq.Samples
             // Note that query ends with ToArrayAsync
 
             await _g
-              .V(_josh.Id!, _peter.Id!)
-              .AddE<Created>()
-              .To(__ => __
-                  .V(lop.Id!))
-              .ToArrayAsync();
+                .V(_josh.Id!, _peter.Id!)
+                .AddE<Created>()
+                .To(__ => __
+                    .V(lop.Id!))
+                .ToArrayAsync();
 
             await _g
                 .V(_josh.Id!)
@@ -221,13 +228,13 @@ namespace ExRam.Gremlinq.Samples
             // edge between them in a single query.
 
             await _g
-                .AddV(new Person { Name = "Bob", Age = 36 })
+                .AddV(new Person {Name = "Bob", Age = 36})
                 .AddE<Knows>()
                 .To(__ => __
-                    .AddV(new Person { Name = "Jeff", Age = 27 }))
+                    .AddV(new Person {Name = "Jeff", Age = 27}))
                 .FirstAsync();
         }
-        
+
         private async Task Who_does_Marko_know()
         {
             // From Marko, walk all the 'Knows' edge to all the persons
@@ -246,6 +253,31 @@ namespace ExRam.Gremlinq.Samples
             foreach (var person in knownPersonsToMarko)
             {
                 Console.WriteLine($" Marko knows {person}.");
+            }
+
+            Console.WriteLine();
+        }
+
+        private async Task How_long_has_Marko_known_each_person()
+        {
+            // From Marko, walk all the 'Knows' edge and retrieve the Since property
+            var knowsEdgeStepLabel = new StepLabel<Knows>();
+            var whoMarkoKnowsStepLabel = new StepLabel<Person>();
+
+            var knownPersonsToMarkoSince = await _g
+                .V<Person>(_marko!.Id!)
+                .OutE<Knows>()
+                .As(knowsEdgeStepLabel)
+                .InV<Person>()
+                .As(whoMarkoKnowsStepLabel)
+                .Select(knowsEdgeStepLabel, whoMarkoKnowsStepLabel)
+                .ToArrayAsync();
+
+            Console.WriteLine("How long has Marko known each person?");
+
+            foreach (var (knows, who) in knownPersonsToMarkoSince)
+            {
+                Console.WriteLine($"Marko has known {who.Name} since {knows.Since}");
             }
 
             Console.WriteLine();
@@ -447,7 +479,7 @@ namespace ExRam.Gremlinq.Samples
             var personWithThatPhoneNumber = await _g
                 .V<Person>()
                 .Where(person => person
-                    .PhoneNumbers!
+                        .PhoneNumbers!
                     .Contains("+491234567"))
                 .FirstOrDefaultAsync();
 
@@ -468,7 +500,7 @@ namespace ExRam.Gremlinq.Samples
             var personsWithPhoneNumber = await _g
                 .V<Person>()
                 .Where(person => person
-                    .PhoneNumbers!
+                        .PhoneNumbers!
                     .Any());
 
             foreach (var person in personsWithPhoneNumber)
@@ -494,7 +526,8 @@ namespace ExRam.Gremlinq.Samples
 
             foreach (var entityGroup in entityGroups)
             {
-                Console.WriteLine($" There {(entityGroup.Value == 1 ? "is" : "are")} {entityGroup.Value} instance{(entityGroup.Value == 1 ? "" : "s")} of {entityGroup.Key}.");
+                Console.WriteLine(
+                    $" There {(entityGroup.Value == 1 ? "is" : "are")} {entityGroup.Value} instance{(entityGroup.Value == 1 ? "" : "s")} of {entityGroup.Key}.");
             }
 
             Console.WriteLine();
@@ -544,7 +577,7 @@ namespace ExRam.Gremlinq.Samples
                     .V<Person>()
                     .Where(person => ages.Value.Contains(person.Age)));
 
-            foreach(var person in personsWithSpecificAges)
+            foreach (var person in personsWithSpecificAges)
             {
                 Console.WriteLine($" {person.Name?.Value}'s age is either 29, 30 or 31.");
             }
