@@ -277,7 +277,7 @@ namespace ExRam.Gremlinq.Samples
 
             foreach (var (knows, who) in knownPersonsToMarkoSince)
             {
-                Console.WriteLine($"Marko has known {who.Name} since {knows.Since}");
+                Console.WriteLine($"Marko has known {who.Name!.Value} since {knows.Since}");
             }
 
             Console.WriteLine();
